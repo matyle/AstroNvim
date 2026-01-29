@@ -1,49 +1,70 @@
+-- ### AstroNvim Health Checks
+--
+-- use with `:checkhealth astronvim`
+--
+-- copyright 2023
+-- license GNU General Public License v3.0
+
 local M = {}
 
-function M.check()
-  vim.health.report_start "AstroNvim"
+local health = vim.health
 
-  vim.health.report_info("AstroNvim Version: " .. require("astronvim.utils.updater").version(true))
-  vim.health.report_info("Neovim Version: v" .. vim.fn.matchstr(vim.fn.execute "version", "NVIM v\\zs[^\n]*"))
+function M.check()
+  health.start "Checking requirements"
+
+  health.info("AstroNvim Version: " .. require("astronvim").version())
+  health.info("Neovim Version: v" .. vim.fn.matchstr(vim.fn.execute "version", "NVIM v\\zs[^\n]*"))
 
   if vim.version().prerelease then
-    vim.health.report_warn "Neovim nightly is not officially supported and may have breaking changes"
-  elseif vim.fn.has "nvim-0.8" == 1 then
-    vim.health.report_ok "Using stable Neovim >= 0.8.0"
+    health.warn "Neovim nightly is not officially supported and may have breaking changes"
+  elseif vim.fn.has "nvim-0.10.0" == 1 then
+    health.ok "Using stable Neovim >= 0.10.0"
   else
-    vim.health.report_error "Neovim >= 0.8.0 is required"
+    health.error "Neovim >= 0.10.0 is required"
   end
 
   local programs = {
-    { cmd = "git", type = "error", msg = "Used for core functionality such as updater and plugin management" },
     {
-      cmd = { "xdg-open", "open", "explorer" },
+      cmd = { "git" },
+      type = "error",
+      msg = "Used for core functionality such as updater and plugin management",
+    },
+    {
+      cmd = { "xdg-open", "rundll32", "explorer.exe", "open" },
       type = "warn",
       msg = "Used for `gx` mapping for opening files with system opener (Optional)",
     },
-    { cmd = "lazygit", type = "warn", msg = "Used for mappings to pull up git TUI (Optional)" },
-    { cmd = "node", type = "warn", msg = "Used for mappings to pull up node REPL (Optional)" },
-    { cmd = "gdu", type = "warn", msg = "Used for mappings to pull up disk usage analyzer (Optional)" },
-    { cmd = "btm", type = "warn", msg = "Used for mappings to pull up system monitor (Optional)" },
+    {
+      cmd = { "rg" },
+      type = "warn",
+      msg = "Used for Pickers `live_grep` picker, `<Leader>fw` and `<Leader>fW` by default (Optional)",
+    },
+    { cmd = { "lazygit" }, type = "warn", msg = "Used for mappings to pull up git TUI (Optional)" },
+    { cmd = { "node" }, type = "warn", msg = "Used for mappings to pull up node REPL (Optional)" },
+    {
+      cmd = { "gdu", "gdu-go", "gdu_windows_amd64.exe" },
+      type = "warn",
+      msg = "Used for mappings to pull up disk usage analyzer (Optional)",
+    },
+    { cmd = { "btm" }, type = "warn", msg = "Used for mappings to pull up system monitor (Optional)" },
     { cmd = { "python", "python3" }, type = "warn", msg = "Used for mappings to pull up python REPL (Optional)" },
   }
 
   for _, program in ipairs(programs) do
-    if type(program.cmd) == "string" then program.cmd = { program.cmd } end
     local name = table.concat(program.cmd, "/")
     local found = false
     for _, cmd in ipairs(program.cmd) do
       if vim.fn.executable(cmd) == 1 then
         name = cmd
-        found = true
+        if not program.extra_check or program.extra_check(program) then found = true end
         break
       end
     end
 
     if found then
-      vim.health.report_ok(("`%s` is installed: %s"):format(name, program.msg))
+      health.ok(("`%s` is installed: %s"):format(name, program.msg))
     else
-      vim.health["report_" .. program.type](("`%s` is not installed: %s"):format(name, program.msg))
+      health[program.type](("`%s` is not installed: %s"):format(name, program.msg))
     end
   end
 end
